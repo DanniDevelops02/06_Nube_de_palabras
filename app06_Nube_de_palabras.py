@@ -1,651 +1,722 @@
-"""
-☁️ WordCloud Studio — Nube de Palabras Profesional
-Aplicación Streamlit con diseño corporativo limpio
-
-Instalación:
-    pip install streamlit wordcloud matplotlib pandas Pillow numpy
-
-Ejecución:
-    streamlit run wordcloud_app.py
-"""
-
-import streamlit as st
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
-import re
 import io
+import re
+import unicodedata
+import zlib
 from collections import Counter
-from wordcloud import WordCloud, STOPWORDS
+from html import escape
 
-# ─────────────────────────────────────────────
-# CONFIGURACIÓN
-# ─────────────────────────────────────────────
+import matplotlib.font_manager as fm
+import numpy as np
+import pandas as pd
+import streamlit as st
+from wordcloud import STOPWORDS, WordCloud
+
 st.set_page_config(
-    page_title="WordCloud Studio",
+    page_title="Nube de palabras · Daniel Flórez",
     page_icon="☁️",
-    layout="wide",
+    layout="centered",
     initial_sidebar_state="expanded",
 )
 
-# ─────────────────────────────────────────────
-# ESTILOS — diseño profesional / corporativo
-# ─────────────────────────────────────────────
-st.markdown("""
-<style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: 'Inter', sans-serif;
-    }
-
-    /* Fondo general gris muy claro */
-    .stApp {
-        background-color: #f4f5f7;
-    }
-
-    /* Sidebar blanco con borde sutil */
-    [data-testid="stSidebar"] {
-        background-color: #ffffff !important;
-        border-right: 1px solid #dde1e7;
-    }
-    [data-testid="stSidebar"] h2,
-    [data-testid="stSidebar"] h3 {
-        color: #161a1d !important;
-        font-weight: 700 !important;
-        font-size: 0.95rem !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.8px !important;
-    }
-    [data-testid="stSidebar"] label {
-        color: #4a5568 !important;
-        font-size: 0.85rem !important;
-        font-weight: 500 !important;
-    }
-    [data-testid="stSidebar"] p {
-        color: #6b7280 !important;
-        font-size: 0.88rem !important;
-    }
-    [data-testid="stSidebar"] hr {
-        border-color: #e5e7eb !important;
-        margin: 16px 0 !important;
-    }
-
-    /* Inputs */
-    textarea, input[type="text"] {
-        background-color: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 6px !important;
-        color: #111827 !important;
-        font-family: 'Inter', sans-serif !important;
-        font-size: 0.9rem !important;
-    }
-    textarea:focus, input[type="text"]:focus {
-        border-color: #374151 !important;
-        box-shadow: 0 0 0 2px rgba(55,65,81,0.12) !important;
-    }
-
-    /* Selectbox */
-    [data-baseweb="select"] > div {
-        background: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-        border-radius: 6px !important;
-        color: #111827 !important;
-        font-size: 0.9rem !important;
-    }
-
-    /* Títulos */
-    h1 {
-        font-family: 'Inter', sans-serif !important;
-        color: #111827 !important;
-        font-weight: 700 !important;
-        letter-spacing: -0.5px !important;
-    }
-    h2, h3 {
-        font-family: 'Inter', sans-serif !important;
-        color: #1f2937 !important;
-        font-weight: 600 !important;
-    }
-    p, li {
-        color: #374151 !important;
-        font-size: 0.95rem !important;
-        line-height: 1.65 !important;
-    }
-
-    /* Botón principal — antracita sólido */
-    .stButton > button {
-        background: #1f2937 !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 6px !important;
-        font-family: 'Inter', sans-serif !important;
-        font-weight: 600 !important;
-        font-size: 0.9rem !important;
-        letter-spacing: 0.3px !important;
-        padding: 0.6rem 1.4rem !important;
-        width: 100% !important;
-        transition: background 0.2s ease, box-shadow 0.2s ease !important;
-    }
-    .stButton > button:hover {
-        background: #111827 !important;
-        box-shadow: 0 2px 12px rgba(17,24,39,0.25) !important;
-    }
-
-    /* Botón descarga — gris slate */
-    [data-testid="stDownloadButton"] button {
-        background: #374151 !important;
-        color: #ffffff !important;
-        border: none !important;
-        border-radius: 6px !important;
-        font-weight: 600 !important;
-        font-size: 0.88rem !important;
-        transition: background 0.2s !important;
-    }
-    [data-testid="stDownloadButton"] button:hover {
-        background: #1f2937 !important;
-    }
-
-    /* Métricas */
-    [data-testid="metric-container"] {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-top: 3px solid #374151;
-        border-radius: 8px;
-        padding: 18px 22px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.05);
-    }
-    [data-testid="metric-container"] label {
-        color: #6b7280 !important;
-        font-size: 0.78rem !important;
-        font-weight: 600 !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.6px !important;
-    }
-    [data-testid="metric-container"] [data-testid="stMetricValue"] {
-        color: #111827 !important;
-        font-weight: 700 !important;
-        font-size: 1.55rem !important;
-    }
-
-    /* Header */
-    .header-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-left: 5px solid #1f2937;
-        border-radius: 8px;
-        padding: 28px 36px;
-        margin-bottom: 24px;
-        box-shadow: 0 1px 6px rgba(0,0,0,0.06);
-    }
-
-    /* Sección card */
-    .section-card {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 24px 28px;
-        margin-bottom: 16px;
-        box-shadow: 0 1px 4px rgba(0,0,0,0.04);
-    }
-
-    /* Barras de frecuencia */
-    .freq-row {
-        display: flex;
-        align-items: center;
-        gap: 14px;
-        padding: 7px 14px;
-        margin: 4px 0;
-        background: #f9fafb;
-        border: 1px solid #f3f4f6;
-        border-radius: 6px;
-        transition: background 0.15s;
-    }
-    .freq-row:hover { background: #f3f4f6; }
-
-    .freq-bar {
-        height: 8px;
-        background: #374151;
-        border-radius: 4px;
-        display: inline-block;
-        vertical-align: middle;
-    }
-
-    /* Tag de ranking */
-    .rank-tag {
-        background: #f3f4f6;
-        border: 1px solid #e5e7eb;
-        border-radius: 4px;
-        padding: 1px 8px;
-        font-size: 0.75rem;
-        font-weight: 700;
-        color: #6b7280;
-        font-family: 'IBM Plex Mono', monospace;
-        min-width: 36px;
-        text-align: center;
-    }
-
-    /* Welcome items */
-    .info-item {
-        display: flex;
-        align-items: flex-start;
-        gap: 12px;
-        padding: 12px 16px;
-        background: #f9fafb;
-        border: 1px solid #e5e7eb;
-        border-radius: 6px;
-        margin-bottom: 8px;
-    }
-
-    /* Uso cards */
-    .uso-tag {
-        display: inline-block;
-        background: #f3f4f6;
-        border: 1px solid #e5e7eb;
-        border-radius: 20px;
-        padding: 5px 14px;
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #374151;
-        margin: 4px 3px;
-    }
-
-    /* Expander */
-    div[data-testid="stExpander"] {
-        border: 1px solid #e5e7eb !important;
-        border-radius: 8px !important;
-        background: #ffffff !important;
-    }
-
-    hr { border-color: #e5e7eb !important; }
-
-    /* Nube container */
-    .wc-container {
-        background: #ffffff;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        padding: 20px;
-        box-shadow: 0 1px 6px rgba(0,0,0,0.05);
-        margin-bottom: 16px;
-    }
-</style>
-""", unsafe_allow_html=True)
-
-
-# ─────────────────────────────────────────────
-# STOPWORDS
-# ─────────────────────────────────────────────
-STOPWORDS_ES = {
-    "de","la","el","en","y","a","los","del","se","las","un","por","con","no","una","su",
-    "para","es","al","lo","como","mas","pero","sus","le","ya","o","este","si","porque",
-    "esta","entre","cuando","muy","sin","sobre","tambien","me","hasta","hay","donde",
-    "quien","desde","nos","durante","ni","contra","ese","eso","ante","bajo","tras",
-    "que","fue","son","han","ha","ser","era","estan","siendo","sido","he","has","hemos",
-    "habian","tiene","tienen","hacer","puede","pueden","asi","tan","parte","todo","todos",
-    "todas","cada","otro","otra","otros","otras","mismo","misma","nuestro","nuestra",
-    "ellos","ellas","nosotros","les","esa","esos","esas","aquel","aquella","aquellos",
+# =====================================================================
+#  CONTENIDO
+# =====================================================================
+EJEMPLOS = {
+    "Inteligencia artificial": (
+        "La inteligencia artificial es una disciplina de la informática orientada a "
+        "desarrollar sistemas capaces de ejecutar tareas que requieren capacidades "
+        "cognitivas humanas. El aprendizaje automático, las redes neuronales profundas y "
+        "el procesamiento del lenguaje natural constituyen los pilares técnicos de los "
+        "sistemas modernos de inteligencia artificial. Los modelos de lenguaje de gran "
+        "escala, la visión computacional y la robótica autónoma representan aplicaciones "
+        "de vanguardia. La inteligencia artificial transforma sectores como la salud, la "
+        "educación, la manufactura, las finanzas y el transporte, generando eficiencias "
+        "significativas."
+    ),
+    "Colombia": (
+        "Colombia es una nación situada en el extremo noroccidental de América del Sur, "
+        "reconocida por su excepcional biodiversidad, riqueza cultural y diversidad de "
+        "paisajes. Bogotá es la capital y principal centro económico, seguida de Medellín, "
+        "Cali y Barranquilla como ciudades de relevancia nacional. El café colombiano goza "
+        "de reconocimiento internacional por su calidad y perfil aromático. La floricultura "
+        "colombiana abastece mercados globales con alta competitividad. El país alberga "
+        "ecosistemas del Amazonas, los Andes, el Caribe y el Pacífico, constituyéndose como "
+        "uno de los territorios con mayor biodiversidad del planeta."
+    ),
+    "Tecnología 4.0": (
+        "La cuarta revolución industrial redefine los modelos productivos mediante la "
+        "convergencia de tecnologías digitales avanzadas. El Internet de las cosas, la "
+        "inteligencia artificial, el análisis de grandes datos, la robótica colaborativa y "
+        "la automatización inteligente son pilares estratégicos de la industria moderna. "
+        "Las fábricas inteligentes integran sensores, conectividad y analítica para "
+        "optimizar procesos en tiempo real. La manufactura aditiva, los gemelos digitales "
+        "y la realidad aumentada transforman la ingeniería de producción. La computación en "
+        "la nube y la ciberseguridad son habilitadores fundamentales de la transformación "
+        "digital empresarial."
+    ),
 }
 
-def obtener_stopwords(idioma):
-    sw = set(STOPWORDS)
-    if idioma in ("Español", "Ambos"):
-        sw |= STOPWORDS_ES
-    return sw
-
-
-# ─────────────────────────────────────────────
-# PALETAS PROFESIONALES
-# ─────────────────────────────────────────────
+# Paletas pensadas para fondo claro. En fondo oscuro se aclaran solas.
 PALETAS = {
-    "Escala de grises":     ["#111827","#1f2937","#374151","#4b5563","#6b7280","#9ca3af","#d1d5db"],
-    "Azul corporativo":     ["#1e3a5f","#1d4ed8","#2563eb","#3b82f6","#60a5fa","#93c5fd","#0f2942"],
-    "Verde institucional":  ["#064e3b","#065f46","#047857","#059669","#10b981","#34d399","#6ee7b7"],
-    "Gris azulado":         ["#0f172a","#1e293b","#334155","#475569","#64748b","#94a3b8","#cbd5e1"],
-    "Terracota":            ["#7c2d12","#9a3412","#c2410c","#ea580c","#f97316","#fb923c","#fdba74"],
-    "Índigo profundo":      ["#1e1b4b","#312e81","#3730a3","#4338ca","#4f46e5","#6366f1","#818cf8"],
-    "Monocromático negro":  ["#000000","#111111","#222222","#444444","#666666","#888888","#aaaaaa"],
+    "Océano": ["#3f71a6", "#1b2f45", "#2d5a8a", "#5b8fc2", "#16456e", "#7aa6d1"],
+    "Marino profundo": ["#04152a", "#0d2e5b", "#1b4d8f", "#3886e1", "#2a6bbf", "#0a2342"],
+    "Hielo y menta": ["#2b8a9e", "#3f71a6", "#4fa3a5", "#1b6b7a", "#78c2c4", "#5b8fc2"],
+    "Índigo": ["#312e81", "#3730a3", "#4338ca", "#4f46e5", "#6366f1", "#1e1b4b"],
+    "Grafito": ["#111827", "#1f2937", "#374151", "#4b5563", "#6b7280", "#0f172a"],
+    "Terracota": ["#7c2d12", "#9a3412", "#c2410c", "#ea580c", "#f97316", "#b45309"],
 }
 
-FORMAS = {
-    "Rectángulo": None,
-    "Círculo":    "circle",
+FORMAS = ["Rectángulo", "Círculo", "Nube", "Corazón"]
+
+FONDOS_NUBE = {
+    "Claro": "#ffffff",
+    "Oscuro": "#0d2e5b",
+    "Transparente": None,
 }
 
-def crear_mascara(forma, size=500):
-    if forma == "circle":
-        y, x = np.ogrid[:size, :size]
-        cx, cy = size // 2, size // 2
-        mascara = np.ones((size, size), dtype=np.uint8) * 255
-        mascara[(x - cx)**2 + (y - cy)**2 <= (size // 2 - 12)**2] = 0
-        return mascara
-    return None
+# Fondo de página tipo cuaderno: (imagen del patrón, tamaño del patrón)
+PATRONES = {
+    "Puntos": (
+        "radial-gradient(circle, rgba(63,113,166,.30) 1.5px, transparent 1.7px)",
+        "26px 26px",
+    ),
+    "Rayas": (
+        "linear-gradient(rgba(63,113,166,.20) 1px, transparent 1px)",
+        "100% 34px",
+    ),
+    "Cuadrícula": (
+        "linear-gradient(rgba(63,113,166,.16) 1px, transparent 1px), "
+        "linear-gradient(90deg, rgba(63,113,166,.16) 1px, transparent 1px)",
+        "28px 28px, 28px 28px",
+    ),
+    "Liso": (None, None),
+}
+
+# =====================================================================
+#  ESTILO (paleta fría basada en #3f71a6)
+# =====================================================================
+PRIMARIO = "#3f71a6"
+OSCURO = "#1b2f45"
+CLARO = "#eaf2f9"
+SUAVE = "#a9c7e3"
+
+CSS = """
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@500;600&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600;700&display=swap');
+
+html, body, [class*="css"], .stApp {
+    font-family: 'Inter', sans-serif;
+    font-size: 1.06rem;
+}
+.stApp { background-color: #f6fafd; __PATRON__ }
+header[data-testid="stHeader"] { background: transparent; }
+.block-container { max-width: 940px; padding-top: 3rem; padding-bottom: 4rem; }
+
+/* Hero */
+.hero { text-align: center; padding: 1rem 0 .5rem 0; }
+.hero .etiqueta {
+    font-family: 'Caveat', cursive; font-size: 1.8rem; font-weight: 600;
+    color: __PRIMARIO__; line-height: 1;
+}
+.hero h1 {
+    font-family: 'Playfair Display', serif; font-size: 3.3rem; color: __OSCURO__;
+    margin: .3rem 0 .6rem 0; line-height: 1.1;
+}
+.hero h1 span {
+    background: linear-gradient(transparent 62%, rgba(169, 199, 227, .75) 62%);
+    padding: 0 .12em;
+}
+.hero p { color: #4d6479; font-size: 1.2rem; max-width: 620px; margin: 0 auto; }
+.linea {
+    width: 70px; height: 4px; border-radius: 4px; background: __PRIMARIO__;
+    margin: 1.4rem auto;
+}
+h2, h3 { font-family: 'Playfair Display', serif !important; color: __OSCURO__ !important; }
+
+/* Tarjetas con "cinta washi" */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    position: relative;
+    overflow: visible;
+    background: rgba(255, 255, 255, .94);
+    border: 1px solid __SUAVE__66 !important;
+    border-radius: 18px !important;
+    box-shadow: 0 8px 24px rgba(63, 113, 166, .08);
+    padding: .6rem .8rem;
+}
+[data-testid="stVerticalBlockBorderWrapper"]::before {
+    content: "";
+    position: absolute;
+    top: -9px; left: 28px;
+    width: 78px; height: 18px;
+    background: rgba(169, 199, 227, .7);
+    border-radius: 2px;
+    transform: rotate(-1.5deg);
+    box-shadow: 0 1px 2px rgba(27, 47, 69, .08);
+    z-index: 1;
+}
+
+/* Imagen de la nube */
+[data-testid="stImage"] img { border-radius: 14px; }
+
+/* Métricas */
+[data-testid="stMetric"], [data-testid="metric-container"] {
+    background: white; border: 1px dashed __SUAVE__; border-radius: 14px;
+    padding: 12px 16px;
+}
+[data-testid="stMetricValue"] {
+    font-family: 'Playfair Display', serif; color: __OSCURO__; font-weight: 600;
+}
+[data-testid="stMetricLabel"] { color: #6b8399; }
+
+/* Barras de frecuencia */
+.freq-row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 7px 12px; margin: 5px 0;
+    background: #f6fafd; border: 1px dashed __SUAVE__; border-radius: 10px;
+}
+.freq-row .rank {
+    font-family: 'IBM Plex Mono', monospace; font-size: .78rem; font-weight: 500;
+    color: #6b8399; min-width: 34px;
+}
+.freq-row .palabra { font-weight: 600; color: __OSCURO__; min-width: 110px; }
+.freq-row .barra {
+    flex: 1; height: 8px; background: __CLARO__; border-radius: 4px; overflow: hidden;
+}
+.freq-row .barra > div { height: 100%; background: __PRIMARIO__; border-radius: 4px; }
+.freq-row .num {
+    font-family: 'IBM Plex Mono', monospace; font-size: .88rem; color: __OSCURO__;
+    min-width: 28px; text-align: right;
+}
+
+/* Bloques informativos */
+.info-item {
+    display: flex; align-items: flex-start; gap: 12px;
+    padding: 12px 16px; margin-bottom: 8px;
+    background: #f6fafd; border: 1px dashed __SUAVE__; border-radius: 12px;
+}
+.info-item strong { color: __OSCURO__; }
+.info-item p { margin: 2px 0 0 0; color: #4d6479; font-size: .92rem; }
+.uso-tag {
+    display: inline-block; background: white; border: 1px dashed __SUAVE__;
+    border-radius: 999px; padding: 5px 14px; margin: 4px 3px;
+    font-size: .88rem; font-weight: 500; color: __OSCURO__;
+}
+.texto-procesado {
+    font-family: 'IBM Plex Mono', monospace; font-size: .85rem; line-height: 1.8;
+    color: __OSCURO__; background: #f6fafd; border: 1px dashed __SUAVE__;
+    border-radius: 12px; padding: 16px;
+}
+
+/* Botones */
+.stButton > button, .stDownloadButton > button {
+    background: __PRIMARIO__; color: white; border: 1.5px solid __PRIMARIO__;
+    border-radius: 999px; padding: .65rem 1.6rem; font-size: 1.02rem; font-weight: 600;
+    transition: all .2s ease;
+}
+.stButton > button:hover, .stDownloadButton > button:hover {
+    background: __OSCURO__; border-color: __OSCURO__; color: white;
+    transform: translateY(-2px); box-shadow: 0 8px 18px rgba(27, 47, 69, .25);
+}
+[data-testid="stBaseButton-secondary"] { background: white; color: __PRIMARIO__; }
+
+/* Inputs */
+.stTextArea textarea, .stTextInput input, .stSelectbox div[data-baseweb="select"] > div {
+    border-radius: 12px; border: 1px solid __SUAVE__; font-size: 1.02rem;
+}
+[data-testid="stFileUploaderDropzone"] {
+    background: __CLARO__; border: 2px dashed __SUAVE__; border-radius: 16px;
+}
+[data-testid="stAlert"] { border-radius: 14px; }
+
+/* Sidebar */
+[data-testid="stSidebar"] { background: __OSCURO__; }
+[data-testid="stSidebar"] * { color: #e6f0f9 !important; }
+
+#MainMenu, footer { visibility: hidden; }
+</style>
+"""
 
 
-# ─────────────────────────────────────────────
-# FUNCIONES CORE
-# ─────────────────────────────────────────────
-def limpiar_texto(texto, stopwords, min_longitud):
-    texto = texto.lower()
-    texto = re.sub(r"http\S+|www\S+", "", texto)
-    texto = re.sub(r"[^a-záéíóúüñàâèêîôùûäëïöü\s]", " ", texto, flags=re.UNICODE)
-    palabras = [p for p in texto.split() if p not in stopwords and len(p) >= min_longitud]
-    return " ".join(palabras)
-
-
-def contar_palabras(texto_limpio):
-    return pd.DataFrame(Counter(texto_limpio.split()).most_common(50),
-                        columns=["Palabra", "Frecuencia"])
-
-
-def generar_wordcloud(texto_limpio, paleta_nombre, max_words, fondo, forma, ancho=1000, alto=520):
-    import random
-    colores = PALETAS[paleta_nombre]
-
-    def color_func(word, font_size, position, orientation, random_state=None, **kwargs):
-        rng = random_state or random.Random()
-        return colores[rng.randint(0, len(colores) - 1)]
-
-    mascara = crear_mascara(forma, size=min(ancho, alto))
-    wc = WordCloud(
-        width=ancho, height=alto, max_words=max_words,
-        background_color=fondo, color_func=color_func,
-        mask=mascara, collocations=False,
-        min_font_size=11, max_font_size=120,
-        prefer_horizontal=0.75, relative_scaling=0.5, margin=5,
-    ).generate(texto_limpio)
-
-    fig, ax = plt.subplots(figsize=(ancho / 100, alto / 100))
-    ax.imshow(wc, interpolation="bilinear")
-    ax.axis("off")
-    fig.patch.set_facecolor(fondo)
-    plt.tight_layout(pad=0)
-    return fig
-
-
-def fig_a_bytes(fig):
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=150, bbox_inches="tight",
-                facecolor=fig.get_facecolor())
-    buf.seek(0)
-    return buf.read()
-
-
-# ─────────────────────────────────────────────
-# SIDEBAR
-# ─────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("## ☁️ WordCloud Studio")
-    st.divider()
-
-    # ── Fuente ──
-    st.markdown("### FUENTE DE TEXTO")
-    fuente = st.radio("fuente", ["✍️ Escribir / Pegar", "📂 Subir archivo"],
-                      label_visibility="collapsed")
-    texto_input = ""
-
-    if fuente == "✍️ Escribir / Pegar":
-        texto_input = st.text_area(
-            "Texto:", height=190,
-            placeholder="Pega aquí un artículo, reseña, discurso, encuesta...")
-
-        with st.expander("Cargar texto de ejemplo"):
-            ejemplos = {
-                "Inteligencia Artificial": """
-                La inteligencia artificial es una disciplina de la informática orientada a desarrollar
-                sistemas capaces de ejecutar tareas que requieren capacidades cognitivas humanas.
-                El aprendizaje automático, las redes neuronales profundas y el procesamiento del
-                lenguaje natural constituyen los pilares técnicos de los sistemas modernos de
-                inteligencia artificial. Los modelos de lenguaje de gran escala, la visión
-                computacional y la robótica autónoma representan aplicaciones de vanguardia.
-                La inteligencia artificial transforma sectores como la salud, la educación,
-                la manufactura, las finanzas y el transporte, generando eficiencias significativas.
-                """,
-                "Colombia": """
-                Colombia es una nación situada en el extremo noroccidental de América del Sur,
-                reconocida por su excepcional biodiversidad, riqueza cultural y diversidad de paisajes.
-                Bogotá es la capital y principal centro económico, seguida de Medellín, Cali y
-                Barranquilla como ciudades de relevancia nacional. El café colombiano goza de
-                reconocimiento internacional por su calidad y perfil aromático. La floricultura
-                colombiana abastece mercados globales con alta competitividad. El país alberga
-                ecosistemas del Amazonas, los Andes, el Caribe y el Pacífico, constituyéndose
-                como uno de los territorios con mayor biodiversidad del planeta.
-                """,
-                "Tecnología 4.0": """
-                La cuarta revolución industrial redefine los modelos productivos mediante la
-                convergencia de tecnologías digitales avanzadas. El Internet de las cosas,
-                la inteligencia artificial, el análisis de grandes datos, la robótica colaborativa
-                y la automatización inteligente son pilares estratégicos de la industria moderna.
-                Las fábricas inteligentes integran sensores, conectividad y analítica para
-                optimizar procesos en tiempo real. La manufactura aditiva, los gemelos digitales
-                y la realidad aumentada transforman la ingeniería de producción. La computación
-                en la nube y la ciberseguridad son habilitadores fundamentales de la
-                transformación digital empresarial.
-                """,
-            }
-            ejemplo_sel = st.selectbox("Ejemplo:", list(ejemplos.keys()),
-                                       label_visibility="collapsed")
-            if st.button("Cargar texto seleccionado"):
-                st.session_state["texto_ejemplo"] = ejemplos[ejemplo_sel]
-                st.rerun()
-
-        if "texto_ejemplo" in st.session_state and not texto_input:
-            texto_input = st.session_state["texto_ejemplo"]
-
+def construir_css(patron: str) -> str:
+    imagen, tamano = PATRONES[patron]
+    base = "linear-gradient(180deg, #f6fafd 0%, #eaf2f9 100%)"
+    if imagen:
+        fondo = f"background-image: {imagen}, {base}; background-size: {tamano}, 100% 100%;"
     else:
-        archivo = st.file_uploader("Archivo:", type=["txt", "csv"],
-                                   label_visibility="collapsed")
-        if archivo:
-            if archivo.name.endswith(".txt"):
-                texto_input = archivo.read().decode("utf-8", errors="ignore")
-            elif archivo.name.endswith(".csv"):
-                df_csv = pd.read_csv(archivo)
-                col_txt = st.selectbox("Columna de texto:", df_csv.columns.tolist())
-                texto_input = " ".join(df_csv[col_txt].dropna().astype(str).tolist())
-            st.success(f"Archivo cargado — {len(texto_input):,} caracteres")
-
-    st.divider()
-
-    # ── Procesamiento ──
-    st.markdown("### PROCESAMIENTO")
-    idioma         = st.selectbox("Stopwords:", ["Español", "Inglés", "Ambos", "Ninguno"])
-    min_longitud   = st.slider("Longitud mínima de palabra", 2, 8, 3)
-    palabras_extra = st.text_input("Excluir palabras adicionales:",
-                                   placeholder="ej: también, así, aquí")
-
-    st.divider()
-
-    # ── Apariencia ──
-    st.markdown("### APARIENCIA")
-    paleta_sel  = st.selectbox("Paleta:", list(PALETAS.keys()))
-    fondo_sel   = st.radio("Fondo:", ["Blanco", "Negro"], horizontal=True)
-    fondo_color = "white" if fondo_sel == "Blanco" else "black"
-    forma_sel   = st.selectbox("Forma:", list(FORMAS.keys()))
-    max_words   = st.slider("Máximo de palabras:", 20, 200, 80)
-
-    st.divider()
-    generar = st.button("GENERAR NUBE  ↗", use_container_width=True)
+        fondo = f"background-image: {base};"
+    css = CSS.replace("__PATRON__", fondo)
+    for token, valor in {
+        "__PRIMARIO__": PRIMARIO,
+        "__OSCURO__": OSCURO,
+        "__CLARO__": CLARO,
+        "__SUAVE__": SUAVE,
+    }.items():
+        css = css.replace(token, valor)
+    return css
 
 
-# ─────────────────────────────────────────────
-# CONTENIDO PRINCIPAL
-# ─────────────────────────────────────────────
-
-# Header
-st.markdown("""
-<div class="header-card">
-    <h1 style="margin:0; font-size:1.9rem;">☁️ WordCloud Studio</h1>
-    <p style="margin:6px 0 0 0; color:#6b7280 !important; font-size:0.97rem;">
-        Análisis de frecuencia léxica y visualización de nubes de palabras
-    </p>
-</div>
-""", unsafe_allow_html=True)
-
-# ── Pantalla de bienvenida ──
-if not generar or not texto_input.strip():
-    col_izq, col_der = st.columns([3, 2], gap="large")
-
-    with col_izq:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown("### Acerca de esta herramienta")
-        st.markdown("""
-        Una **nube de palabras** representa visualmente la frecuencia de términos en un texto:
-        las palabras más frecuentes aparecen con mayor tamaño, permitiendo identificar
-        los temas centrales de un corpus de manera intuitiva.
-        """)
-
-        for icono, titulo, desc in [
-            ("📊", "Análisis de frecuencia", "Identifica los términos dominantes de cualquier corpus textual."),
-            ("🔍", "Filtrado inteligente", "Elimina palabras vacías (*stopwords*) en español e inglés."),
-            ("🎨", "Personalización visual", "Selecciona paleta, forma y densidad de la nube."),
-            ("⬇️", "Exportación", "Descarga la imagen en alta resolución y la tabla de frecuencias en CSV."),
-        ]:
-            st.markdown(
-                f'<div class="info-item">'
-                f'<span style="font-size:1.3rem; flex-shrink:0;">{icono}</span>'
-                f'<div><strong style="color:#111827;">{titulo}</strong>'
-                f'<p style="margin:2px 0 0 0; color:#6b7280 !important; font-size:0.88rem;">{desc}</p></div>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-
-        st.markdown("#### Instrucciones")
-        for i, paso in enumerate([
-            "Ingresa o sube un texto en el panel lateral.",
-            "Configura el idioma de *stopwords*, paleta y número de palabras.",
-            "Haz clic en **GENERAR NUBE ↗**.",
-            "Descarga la imagen PNG o la tabla CSV.",
-        ], 1):
-            st.markdown(f"**{i}.** {paso}")
-
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col_der:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown("### Aplicaciones frecuentes")
-        for caso in [
-            "📰 Análisis de prensa y noticias",
-            "📋 Resultados de encuestas abiertas",
-            "💬 Reseñas y comentarios de clientes",
-            "🎓 Análisis de textos académicos",
-            "🗳️ Discursos y documentos políticos",
-            "📚 Estudios literarios y de corpus",
-            "📊 Informes de inteligencia de negocio",
-        ]:
-            st.markdown(
-                f'<span class="uso-tag">{caso}</span>',
-                unsafe_allow_html=True,
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-        st.markdown('<div class="section-card" style="margin-top:16px;">', unsafe_allow_html=True)
-        st.markdown("### Paletas disponibles")
-        for nombre in PALETAS.keys():
-            st.markdown(
-                f'<div style="padding:5px 0; border-bottom:1px solid #f3f4f6;">'
-                f'<span style="color:#374151; font-size:0.88rem; font-weight:500;">{nombre}</span>'
-                f'</div>',
-                unsafe_allow_html=True,
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    if not texto_input.strip() and generar:
-        st.warning("Ingresa un texto en el panel lateral antes de generar la nube.")
-    st.stop()
+# =====================================================================
+#  LÓGICA: LIMPIEZA Y ANÁLISIS DE TEXTO
+# =====================================================================
+PATRON_PALABRA = r"[^\W\d_]+"  # letras de cualquier idioma (con tildes, ñ, etc.)
 
 
-# ─────────────────────────────────────────────
-# PROCESAMIENTO
-# ─────────────────────────────────────────────
-stopwords_set = obtener_stopwords(idioma) if idioma != "Ninguno" else set()
-if palabras_extra.strip():
-    stopwords_set |= {p.strip().lower() for p in palabras_extra.split(",") if p.strip()}
+def normalizar(palabra: str) -> str:
+    """Quita tildes para comparar (conserva la ñ): 'más' y 'mas' son la misma."""
+    nfd = unicodedata.normalize("NFD", palabra)
+    sin_marcas = re.sub(r"(?<!n)[\u0300-\u036f]", "", nfd)
+    return unicodedata.normalize("NFC", sin_marcas)
 
-texto_limpio = limpiar_texto(texto_input, stopwords_set, min_longitud)
 
-if not texto_limpio.strip():
-    st.error("El texto resultante está vacío. Reduce la longitud mínima o cambia la configuración de stopwords.")
-    st.stop()
+_STOPWORDS_ES = """
+a al algo algún alguna algunas alguno algunos allá allí ante antes aquel aquella aquellas
+aquello aquellos aquí así aun aún aunque bajo cada casi como con contra cual cuales cuando
+cuanto cuyo da dan de del demás dentro desde después donde dos durante e el ella ellas ello
+ellos en entonces entre era eran eres es esa esas ese eso esos esta está estaba estaban
+estado estamos están estar estas este esto estos estoy fue fueron fui ha había habían haber
+habrá han hasta hay he hecho hemos hace hacen hacer hacia incluso ir la las le les lo los
+luego mas más me mediante mientras mi mis mismo misma mismos mismas mucha muchas mucho
+muchos muy nada ni no nos nosotros nuestra nuestras nuestro nuestros nunca o os otra otras
+otro otros para pero poco pocos podemos poder podía puede pueden puedo pues que qué quien
+quienes quién se sea sean según ser será serán sería si sí siempre siendo sido sin sino sobre
+solo sólo son soy su sus tal tales también tampoco tan tanto te tener tenemos tenía tiene
+tienen tengo ti todavía todo todos tras tu tú tus un una uno unos usted ustedes va van
+varias varios vez voy vosotros y ya yo
+"""
 
-df_freq        = contar_palabras(texto_limpio)
-total_palabras = len(texto_limpio.split())
-vocabulario    = len(df_freq)
+SW_ES = {normalizar(p) for p in _STOPWORDS_ES.split()}
+SW_EN = {normalizar(p.lower()) for p in STOPWORDS}
 
-# ── Métricas ──
-m1, m2, m3, m4 = st.columns(4)
-m1.metric("Palabras procesadas",     f"{total_palabras:,}")
-m2.metric("Vocabulario único",       f"{vocabulario:,}")
-m3.metric("Término más frecuente",   df_freq.iloc[0]["Palabra"] if not df_freq.empty else "—")
-m4.metric("Frecuencia máxima",       int(df_freq.iloc[0]["Frecuencia"]) if not df_freq.empty else 0)
 
-st.markdown("<br>", unsafe_allow_html=True)
+def stopwords_para(idioma: str) -> set:
+    if idioma == "Español":
+        return SW_ES
+    if idioma == "Inglés":
+        return SW_EN
+    if idioma == "Ambos":
+        return SW_ES | SW_EN
+    return set()
 
-# ── Nube ──
-with st.spinner("Generando nube de palabras..."):
-    fig_wc = generar_wordcloud(
-        texto_limpio, paleta_sel, max_words, fondo_color,
-        FORMAS[forma_sel], ancho=1000, alto=520,
-    )
 
-st.markdown('<div class="wc-container">', unsafe_allow_html=True)
-st.markdown(f"**Nube de palabras** &nbsp;·&nbsp; Paleta: *{paleta_sel}* &nbsp;·&nbsp; Fondo: *{fondo_sel}* &nbsp;·&nbsp; {max_words} palabras máx.")
-st.pyplot(fig_wc, use_container_width=True)
-st.markdown('</div>', unsafe_allow_html=True)
+def detectar_idioma(texto: str) -> str:
+    palabras = [normalizar(p) for p in re.findall(PATRON_PALABRA, texto.lower())]
+    es = sum(p in SW_ES for p in palabras)
+    en = sum(p in SW_EN for p in palabras)
+    return "Español" if es >= en else "Inglés"
 
-img_bytes = fig_a_bytes(fig_wc)
-st.download_button(
-    "⬇️ Descargar imagen PNG",
-    data=img_bytes, file_name="wordcloud.png", mime="image/png",
-    use_container_width=True,
-)
 
-st.divider()
+def tokenizar(texto: str, stopwords: set, min_longitud: int) -> list:
+    """Devuelve las palabras útiles: sin enlaces, números, stopwords ni palabras cortas."""
+    texto = re.sub(r"https?://\S+|www\.\S+", " ", texto.lower())
+    palabras = re.findall(PATRON_PALABRA, texto)
+    return [p for p in palabras if len(p) >= min_longitud and normalizar(p) not in stopwords]
 
-# ── Análisis ──
-col_freq, col_tabla = st.columns([3, 2], gap="large")
 
-with col_freq:
-    st.markdown("### Frecuencia léxica — Top 20")
-    top20    = df_freq.head(20)
-    max_freq = top20["Frecuencia"].max()
+def estadisticas(texto: str) -> dict:
+    todas = re.findall(PATRON_PALABRA, texto.lower())
+    n = len(todas)
+    unicas = len(set(todas))
+    oraciones = len([s for s in re.split(r"[.!?…]+", texto) if s.strip()])
+    minutos = n / 200
+    return {
+        "palabras": n,
+        "oraciones": oraciones,
+        "unicas": unicas,
+        "riqueza": unicas / n if n else 0,
+        "longitud_media": sum(len(p) for p in todas) / n if n else 0,
+        "lectura": "< 1 min" if minutos < 1 else f"{round(minutos)} min",
+    }
 
-    for rank, (_, row) in enumerate(top20.iterrows(), 1):
-        p = row["Palabra"]
-        f = int(row["Frecuencia"])
-        barra_w = max(12, int((f / max_freq) * 210))
-        st.markdown(
-            f'<div class="freq-row">'
-            f'<span class="rank-tag">#{rank:02d}</span>'
-            f'<span style="font-weight:600; color:#111827; min-width:130px; font-size:0.93rem;">{p}</span>'
-            f'<div class="freq-bar" style="width:{barra_w}px; opacity:{0.5 + 0.5*(f/max_freq):.2f};"></div>'
-            f'<span style="font-family:\'IBM Plex Mono\',monospace; font-size:0.88rem; '
-            f'color:#374151; min-width:28px; text-align:right; font-weight:500;">{f}</span>'
-            f'</div>',
-            unsafe_allow_html=True,
+
+def decodificar(datos: bytes) -> str:
+    for codificacion in ("utf-8-sig", "utf-8", "latin-1"):
+        try:
+            return datos.decode(codificacion)
+        except UnicodeDecodeError:
+            continue
+    return datos.decode("utf-8", errors="ignore")
+
+
+# =====================================================================
+#  LÓGICA: NUBE DE PALABRAS
+# =====================================================================
+def crear_mascara(forma: str):
+    """Máscara para WordCloud: 255 = fuera de la forma, 0 = dentro."""
+    if forma == "Rectángulo":
+        return None
+
+    if forma == "Círculo":
+        n = 600
+        y, x = np.ogrid[:n, :n]
+        dentro = (x - n / 2) ** 2 + (y - n / 2) ** 2 <= (n / 2 - 8) ** 2
+
+    elif forma == "Nube":
+        w, h = 1000, 600
+        y, x = np.ogrid[:h, :w]
+
+        def circulo(cx, cy, r):
+            return (x - cx) ** 2 + (y - cy) ** 2 <= r**2
+
+        dentro = (
+            circulo(250, 400, 160)
+            | circulo(750, 400, 160)
+            | circulo(500, 300, 230)
+            | circulo(360, 270, 150)
+            | circulo(650, 270, 150)
+            | ((x >= 250) & (x <= 750) & (y >= 400) & (y <= 560))
         )
 
-with col_tabla:
-    st.markdown("### Tabla de frecuencias")
-    st.dataframe(
-        df_freq.head(30).style
-               .background_gradient(subset=["Frecuencia"], cmap="Greys")
-               .format({"Frecuencia": "{:,}"}),
-        use_container_width=True, height=500,
-    )
-    csv_bytes = df_freq.to_csv(index=False).encode("utf-8")
-    st.download_button(
-        "⬇️ Exportar tabla (.csv)",
-        data=csv_bytes, file_name="frecuencias.csv", mime="text/csv",
-        use_container_width=True,
-    )
+    else:  # Corazón
+        n = 600
+        y, x = np.ogrid[:n, :n]
+        cx = (x - n / 2) / (n * 0.36)
+        cy = -(y - n * 0.47) / (n * 0.36)
+        dentro = (cx**2 + cy**2 - 1) ** 3 - cx**2 * cy**3 <= 0
 
-st.divider()
+    return np.where(dentro, 0, 255).astype(np.uint8)
 
-with st.expander("Ver texto procesado (tras eliminación de stopwords)"):
-    preview = texto_limpio[:2500] + ("..." if len(texto_limpio) > 2500 else "")
+
+def aclarar(color_hex: str, cantidad: float = 0.45) -> str:
+    """Mezcla un color con blanco (para que se lea sobre fondo oscuro)."""
+    r, g, b = (int(color_hex[i : i + 2], 16) for i in (1, 3, 5))
+    r, g, b = (round(c + (255 - c) * cantidad) for c in (r, g, b))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+@st.cache_data(show_spinner=False, max_entries=30)
+def generar_nube(frecuencias: tuple, paleta: str, fondo: str, forma: str, max_words: int) -> bytes:
+    """Genera la nube y la devuelve como PNG. El resultado queda en caché."""
+    color_fondo = FONDOS_NUBE[fondo]
+    colores = PALETAS[paleta]
+    if fondo == "Oscuro":
+        colores = [aclarar(c) for c in colores]
+
+    def color_func(word, **kwargs):
+        # El color depende de la palabra, así la nube se ve igual cada vez
+        return colores[zlib.crc32(word.encode("utf-8")) % len(colores)]
+
+    fuente = fm.findfont(fm.FontProperties(family="DejaVu Sans", weight="bold"))
+    nube = WordCloud(
+        width=1000,
+        height=600,
+        mask=crear_mascara(forma),
+        background_color=color_fondo,
+        mode="RGB" if color_fondo else "RGBA",
+        color_func=color_func,
+        font_path=fuente,
+        max_words=max_words,
+        min_font_size=10,
+        max_font_size=140,
+        prefer_horizontal=0.8,
+        relative_scaling=0.5,
+        margin=4,
+        scale=2,
+        random_state=42,
+    ).generate_from_frequencies(dict(frecuencias))
+
+    buffer = io.BytesIO()
+    nube.to_image().save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+# =====================================================================
+#  CALLBACKS
+# =====================================================================
+def cargar_ejemplo():
+    st.session_state["texto"] = EJEMPLOS[st.session_state["ejemplo_sel"]]
+
+
+# =====================================================================
+#  PÁGINA
+# =====================================================================
+with st.sidebar:
+    st.subheader("Cómo usarlo")
     st.markdown(
-        f'<p style="font-family:IBM Plex Mono,monospace; font-size:0.85rem; '
-        f'color:#374151; background:#f9fafb; padding:16px; border-radius:6px; '
-        f'border:1px solid #e5e7eb; line-height:1.8;">{preview}</p>',
-        unsafe_allow_html=True,
+        "1. Escribe, pega o sube un texto.\n"
+        "2. Ajusta idioma, paleta y forma de la nube.\n"
+        "3. Mira la nube, las estadísticas y las palabras más frecuentes.\n"
+        "4. Descarga la imagen o la tabla."
+    )
+    st.subheader("Estilo de la página")
+    patron = st.radio(
+        "Fondo de cuaderno",
+        list(PATRONES),
+        horizontal=True,
+        label_visibility="collapsed",
     )
 
-plt.close("all")
+st.markdown(construir_css(patron), unsafe_allow_html=True)
+
+st.markdown(
+    """
+    <div class="hero">
+        <div class="etiqueta">cuaderno de análisis de texto ✎</div>
+        <h1>Nube de <span>palabras</span></h1>
+        <p>Pega un texto y descubre de un vistazo cuáles son sus palabras clave.</p>
+        <div class="linea"></div>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ---- 1. Texto ----
+texto_input = ""
+with st.container(border=True):
+    st.subheader("1 · Tu texto")
+    fuente = st.radio(
+        "Fuente del texto",
+        ["✍️ Escribir o pegar", "📂 Subir archivo"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    if fuente.startswith("✍️"):
+        st.text_area(
+            "Texto",
+            key="texto",
+            height=190,
+            placeholder="Pega aquí un artículo, una reseña, un discurso, respuestas de una encuesta...",
+            label_visibility="collapsed",
+        )
+        texto_input = st.session_state.get("texto", "")
+        c1, c2 = st.columns([3, 1], vertical_alignment="bottom")
+        with c1:
+            st.selectbox("Texto de ejemplo", list(EJEMPLOS), key="ejemplo_sel")
+        with c2:
+            st.button("Cargar", on_click=cargar_ejemplo, use_container_width=True)
+
+    else:
+        archivo = st.file_uploader(
+            "Archivo de texto",
+            type=["txt", "md", "csv"],
+            label_visibility="collapsed",
+        )
+        if archivo is not None:
+            contenido = decodificar(archivo.getvalue())
+            if archivo.name.lower().endswith(".csv"):
+                try:
+                    tabla = pd.read_csv(io.StringIO(contenido), sep=None, engine="python")
+                except Exception:
+                    try:
+                        tabla = pd.read_csv(io.StringIO(contenido))
+                    except Exception as error:
+                        tabla = None
+                        st.error(f"No se pudo leer el CSV. ({error})")
+                if tabla is not None and not tabla.empty:
+                    columnas = list(tabla.columns)
+                    candidatas = [c for c in columnas if not pd.api.types.is_numeric_dtype(tabla[c])]
+                    por_defecto = columnas.index(candidatas[0]) if candidatas else 0
+                    columna = st.selectbox("Columna de texto", columnas, index=por_defecto)
+                    texto_input = " . ".join(tabla[columna].dropna().astype(str).tolist())
+            else:
+                texto_input = contenido
+            if texto_input:
+                st.success(f"Archivo cargado: {len(texto_input):,} caracteres.")
+
+st.write("")
+
+# ---- 2. Ajustes ----
+with st.container(border=True):
+    st.subheader("2 · Ajustes")
+    a1, a2 = st.columns(2)
+    with a1:
+        idioma_sel = st.selectbox(
+            "Palabras vacías (stopwords)",
+            ["Automático", "Español", "Inglés", "Ambos", "Ninguno"],
+            help="Son palabras muy comunes (el, de, the, and...) que no aportan significado.",
+        )
+    with a2:
+        min_longitud = st.slider("Longitud mínima de palabra", 2, 8, 3)
+    palabras_extra = st.text_input(
+        "Excluir palabras adicionales",
+        placeholder="ej: gracias, hola, señor",
+    )
+    b1, b2 = st.columns(2)
+    with b1:
+        paleta_sel = st.selectbox("Paleta de colores", list(PALETAS))
+    with b2:
+        forma_sel = st.selectbox("Forma de la nube", FORMAS)
+    b3, b4 = st.columns(2)
+    with b3:
+        fondo_sel = st.radio("Fondo de la nube", list(FONDOS_NUBE), horizontal=True)
+    with b4:
+        max_words = st.slider("Máximo de palabras", 20, 200, 80)
+
+st.write("")
+
+# ---- Sin texto: pantalla de bienvenida ----
+if not texto_input.strip():
+    with st.container(border=True):
+        st.subheader("¿Qué es una nube de palabras?")
+        st.write(
+            "Es una imagen donde las palabras más frecuentes de un texto aparecen más "
+            "grandes. Sirve para identificar los temas centrales de un vistazo."
+        )
+        for icono, titulo, desc in [
+            ("📊", "Análisis de frecuencia", "Cuenta qué palabras y pares de palabras dominan el texto."),
+            ("🔍", "Filtrado inteligente", "Quita palabras vacías en español e inglés, con o sin tildes."),
+            ("🎨", "Personalización", "Elige paleta, forma (círculo, nube, corazón) y fondo."),
+            ("⬇️", "Exportación", "Descarga la nube en PNG y la tabla de frecuencias en CSV."),
+        ]:
+            st.markdown(
+                f'<div class="info-item"><span style="font-size:1.3rem">{icono}</span>'
+                f"<div><strong>{titulo}</strong><p>{desc}</p></div></div>",
+                unsafe_allow_html=True,
+            )
+        st.markdown(
+            "".join(
+                f'<span class="uso-tag">{caso}</span>'
+                for caso in [
+                    "📰 Prensa y noticias",
+                    "📋 Encuestas abiertas",
+                    "💬 Reseñas de clientes",
+                    "🎓 Textos académicos",
+                    "🗳️ Discursos",
+                    "📚 Estudios literarios",
+                ]
+            ),
+            unsafe_allow_html=True,
+        )
+        st.caption("Carga un texto de ejemplo en el paso 1 para empezar.")
+    st.stop()
+
+# ---- Procesamiento ----
+idioma_real = detectar_idioma(texto_input) if idioma_sel == "Automático" else idioma_sel
+stopwords = set(stopwords_para(idioma_real))
+stopwords |= {
+    normalizar(p.strip().lower())
+    for p in re.split(r"[,;\n]", palabras_extra)
+    if p.strip()
+}
+
+palabras = tokenizar(texto_input, stopwords, min_longitud)
+if not palabras:
+    st.error(
+        "No quedaron palabras después de la limpieza. Reduce la longitud mínima o cambia "
+        "la configuración de stopwords."
+    )
+    st.stop()
+
+conteo = Counter(palabras)
+frecuentes = conteo.most_common()
+df_freq = pd.DataFrame(frecuentes[:50], columns=["Palabra", "Frecuencia"])
+stats = estadisticas(texto_input)
+
+# ---- 3. Nube ----
+with st.container(border=True):
+    st.subheader("3 · Tu nube de palabras")
+    if idioma_sel == "Automático":
+        st.caption(f"Idioma detectado para las stopwords: {idioma_real}.")
+    try:
+        with st.spinner("Generando la nube..."):
+            png = generar_nube(
+                tuple(frecuentes[:max_words]), paleta_sel, fondo_sel, forma_sel, max_words
+            )
+        st.image(png, use_container_width=True)
+        st.download_button(
+            "Descargar imagen PNG",
+            data=png,
+            file_name="nube_de_palabras.png",
+            mime="image/png",
+            use_container_width=True,
+        )
+    except Exception as error:
+        st.error(f"No se pudo generar la nube. ({error})")
+
+st.write("")
+
+# ---- 4. Estadísticas ----
+with st.container(border=True):
+    st.subheader("4 · Análisis del texto")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("Palabras", f"{stats['palabras']:,}")
+    m2.metric("Oraciones", f"{stats['oraciones']:,}")
+    m3.metric("Palabras únicas", f"{stats['unicas']:,}")
+    m4, m5, m6 = st.columns(3)
+    m4.metric("Riqueza léxica", f"{stats['riqueza']:.0%}")
+    m5.metric("Longitud media", f"{stats['longitud_media']:.1f} letras")
+    m6.metric("Tiempo de lectura", stats["lectura"])
+    st.caption(
+        f"Tras la limpieza quedan {len(palabras):,} palabras útiles y "
+        f"{len(conteo):,} distintas. La riqueza léxica es el porcentaje de palabras "
+        "únicas sobre el total."
+    )
+
+st.write("")
+
+# ---- 5. Frecuencias ----
+with st.container(border=True):
+    st.subheader("5 · Frecuencias")
+    tab_palabras, tab_pares, tab_texto = st.tabs(
+        ["📊 Palabras", "🔗 Pares de palabras", "🧾 Texto procesado"]
+    )
+
+    with tab_palabras:
+        col_barras, col_tabla = st.columns(2, gap="large")
+        with col_barras:
+            top = df_freq.head(15)
+            maximo = int(top["Frecuencia"].max())
+            filas = []
+            for rank, (palabra, frecuencia) in enumerate(top.itertuples(index=False), 1):
+                porcentaje = max(6, round(100 * frecuencia / maximo))
+                filas.append(
+                    f'<div class="freq-row"><span class="rank">#{rank:02d}</span>'
+                    f'<span class="palabra">{escape(palabra)}</span>'
+                    f'<div class="barra"><div style="width:{porcentaje}%"></div></div>'
+                    f'<span class="num">{int(frecuencia)}</span></div>'
+                )
+            st.markdown("".join(filas), unsafe_allow_html=True)
+        with col_tabla:
+            st.dataframe(
+                df_freq,
+                use_container_width=True,
+                hide_index=True,
+                height=430,
+                column_config={
+                    "Frecuencia": st.column_config.ProgressColumn(
+                        "Frecuencia",
+                        min_value=0,
+                        max_value=int(df_freq["Frecuencia"].max()),
+                        format="%d",
+                    )
+                },
+            )
+            st.download_button(
+                "Exportar tabla (.csv)",
+                data=pd.DataFrame(frecuentes, columns=["Palabra", "Frecuencia"])
+                .to_csv(index=False)
+                .encode("utf-8"),
+                file_name="frecuencias.csv",
+                mime="text/csv",
+                use_container_width=True,
+            )
+
+    with tab_pares:
+        pares = Counter(zip(palabras, palabras[1:]))
+        repetidos = [(f"{a} {b}", n) for (a, b), n in pares.most_common(20) if n >= 2]
+        if repetidos:
+            df_pares = pd.DataFrame(repetidos, columns=["Par de palabras", "Veces"])
+            st.dataframe(
+                df_pares,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "Veces": st.column_config.ProgressColumn(
+                        "Veces",
+                        min_value=0,
+                        max_value=int(df_pares["Veces"].max()),
+                        format="%d",
+                    )
+                },
+            )
+            st.caption("Son palabras que aparecen juntas, una tras otra, después de la limpieza.")
+        else:
+            st.info("Ningún par de palabras se repite. Prueba con un texto más largo.")
+
+    with tab_texto:
+        vista = " ".join(palabras)
+        recorte = vista[:2500] + ("..." if len(vista) > 2500 else "")
+        st.markdown(f'<div class="texto-procesado">{escape(recorte)}</div>', unsafe_allow_html=True)
+
+st.write("")
+st.caption("Nube generada con la librería wordcloud.")
