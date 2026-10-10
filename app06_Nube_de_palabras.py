@@ -137,7 +137,8 @@ h2, h3 { font-family: 'Playfair Display', serif !important; color: __OSCURO__ !i
 [data-testid="stVerticalBlockBorderWrapper"] {
     position: relative;
     overflow: visible;
-    background: rgba(255, 255, 255, .94);
+    background: #ffffff !important;
+    background-color: #ffffff !important;
     border: 1px solid __SUAVE__66 !important;
     border-radius: 18px !important;
     box-shadow: 0 8px 24px rgba(63, 113, 166, .08);
