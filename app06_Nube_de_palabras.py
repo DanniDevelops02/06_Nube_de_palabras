@@ -122,7 +122,7 @@ header[data-testid="stHeader"] { background: transparent; }
     font-family: 'Playfair Display', serif; font-size: 3.3rem; color: __OSCURO__;
     margin: .3rem 0 .6rem 0; line-height: 1.1;
 }
-.hero h1 span {
+.hero h1 .marca {
     background: linear-gradient(transparent 62%, rgba(169, 199, 227, .75) 62%);
     padding: 0 .12em;
 }
@@ -133,28 +133,30 @@ header[data-testid="stHeader"] { background: transparent; }
 }
 h2, h3 { font-family: 'Playfair Display', serif !important; color: __OSCURO__ !important; }
 
-/* Tarjetas con "cinta washi" */
-[data-testid="stVerticalBlockBorderWrapper"] {
+/* Tarjetas con "cinta washi" (contenedores con key="tarjeta_...") */
+[class*="st-key-tarjeta"] {
     position: relative;
-    overflow: visible;
+    box-sizing: border-box;
     background: #ffffff !important;
-    background-color: #ffffff !important;
-    border: 1px solid __SUAVE__66 !important;
+    border: 1px solid __SUAVE__99 !important;
     border-radius: 18px !important;
-    box-shadow: 0 8px 24px rgba(63, 113, 166, .08);
-    padding: .6rem .8rem;
+    box-shadow: 0 8px 24px rgba(63, 113, 166, .10);
+    padding: 1.4rem 1.5rem 1.3rem 1.5rem !important;
 }
-[data-testid="stVerticalBlockBorderWrapper"]::before {
+[class*="st-key-tarjeta"]::before {
     content: "";
     position: absolute;
-    top: -9px; left: 28px;
-    width: 78px; height: 18px;
-    background: rgba(169, 199, 227, .7);
+    top: -10px; left: 28px;
+    width: 80px; height: 20px;
+    background: rgba(169, 199, 227, .75);
     border-radius: 2px;
     transform: rotate(-1.5deg);
-    box-shadow: 0 1px 2px rgba(27, 47, 69, .08);
-    z-index: 1;
+    box-shadow: 0 1px 2px rgba(27, 47, 69, .10);
+    z-index: 2;
 }
+
+/* Quita el icono de enlace que Streamlit añade a los títulos */
+[data-testid="stHeaderActionElements"] { display: none !important; }
 
 /* Imagen de la nube */
 [data-testid="stImage"] img { border-radius: 14px; }
@@ -452,7 +454,7 @@ st.markdown(
     """
     <div class="hero">
         <div class="etiqueta">cuaderno de análisis de texto ✎</div>
-        <h1>Nube de <span>palabras</span></h1>
+        <h1>Nube de <span class="marca">palabras</span></h1>
         <p>Pega un texto y descubre de un vistazo cuáles son sus palabras clave.</p>
         <div class="linea"></div>
     </div>
@@ -462,7 +464,7 @@ st.markdown(
 
 # ---- 1. Texto ----
 texto_input = ""
-with st.container(border=True):
+with st.container(key="tarjeta_texto"):
     st.subheader("1 · Tu texto")
     fuente = st.radio(
         "Fuente del texto",
@@ -517,7 +519,7 @@ with st.container(border=True):
 st.write("")
 
 # ---- 2. Ajustes ----
-with st.container(border=True):
+with st.container(key="tarjeta_ajustes"):
     st.subheader("2 · Ajustes")
     a1, a2 = st.columns(2)
     with a1:
@@ -547,7 +549,7 @@ st.write("")
 
 # ---- Sin texto: pantalla de bienvenida ----
 if not texto_input.strip():
-    with st.container(border=True):
+    with st.container(key="tarjeta_bienvenida"):
         st.subheader("¿Qué es una nube de palabras?")
         st.write(
             "Es una imagen donde las palabras más frecuentes de un texto aparecen más "
@@ -604,7 +606,7 @@ df_freq = pd.DataFrame(frecuentes[:50], columns=["Palabra", "Frecuencia"])
 stats = estadisticas(texto_input)
 
 # ---- 3. Nube ----
-with st.container(border=True):
+with st.container(key="tarjeta_nube"):
     st.subheader("3 · Tu nube de palabras")
     if idioma_sel == "Automático":
         st.caption(f"Idioma detectado para las stopwords: {idioma_real}.")
@@ -627,7 +629,7 @@ with st.container(border=True):
 st.write("")
 
 # ---- 4. Estadísticas ----
-with st.container(border=True):
+with st.container(key="tarjeta_analisis"):
     st.subheader("4 · Análisis del texto")
     m1, m2, m3 = st.columns(3)
     m1.metric("Palabras", f"{stats['palabras']:,}")
@@ -646,7 +648,7 @@ with st.container(border=True):
 st.write("")
 
 # ---- 5. Frecuencias ----
-with st.container(border=True):
+with st.container(key="tarjeta_frecuencias"):
     st.subheader("5 · Frecuencias")
     tab_palabras, tab_pares, tab_texto = st.tabs(
         ["📊 Palabras", "🔗 Pares de palabras", "🧾 Texto procesado"]
